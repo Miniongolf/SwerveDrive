@@ -4,6 +4,31 @@
         "project_name": "SwerveDrive",
         "target": "v5",
         "templates": {
+            "hardware": {
+                "location": "/Users/nicholas.cheng/Library/Application Support/PROS/templates/hardware@0.4.2",
+                "metadata": {
+                    "origin": "local"
+                },
+                "name": "hardware",
+                "py/object": "pros.conductor.templates.local_template.LocalTemplate",
+                "supported_kernels": "^4.1.1",
+                "system_files": [
+                    "include/hardware/Encoder/Encoder.hpp",
+                    "include/hardware/Motor/MotorGroup.hpp",
+                    "include/hardware/Port.hpp",
+                    "include/hardware/Device.hpp",
+                    "include/hardware/Encoder/V5RotationSensor.hpp",
+                    "include/hardware/IMU/IMU.hpp",
+                    "include/hardware/Motor/Motor.hpp",
+                    "include/hardware/util.hpp",
+                    "include/hardware/IMU/V5InertialSensor.hpp",
+                    "include/hardware/Encoder/ADIEncoder.hpp",
+                    "firmware/hardware.a"
+                ],
+                "target": "v5",
+                "user_files": [],
+                "version": "0.4.2"
+            },
             "kernel": {
                 "location": "/Users/nicholas.cheng/Library/Application Support/PROS/templates/kernel@4.1.1",
                 "metadata": {
