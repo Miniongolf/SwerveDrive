@@ -1,16 +1,18 @@
 #include "robot/chassis/swervePod.hpp"
+#include "lemlib/pid.hpp"
 #include "units/Angle.hpp"
 #include "units/units.hpp"
 
 SwervePod::SwervePod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor, lemlib::V5RotationSensor* rotSens,
-                     const Length wheelDiameter, const Number diffyRatio)
+                     const Length wheelDiameter, const Number diffyRatio, lemlib::PID spinPID)
     : m_topMotor(topMotor),
       m_bottomMotor(bottomMotor),
       m_rotSens(rotSens),
       m_circumference(M_PI * wheelDiameter / rad),
       m_diffyRatio(diffyRatio),
       m_maxSpeed(2 * topMotor->getOutputVelocity() * m_diffyRatio * m_circumference),
-      m_maxSpin(topMotor->getOutputVelocity()) {
+      m_maxSpin(topMotor->getOutputVelocity()),
+      m_spinPID(spinPID) {
     if (m_topMotor->getOutputVelocity() != m_bottomMotor->getOutputVelocity()) {
         throw std::invalid_argument("Diffy swerve pod motors must have equal output velocities");
     }

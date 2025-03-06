@@ -2,9 +2,10 @@
 
 #include "hardware/Encoder/V5RotationSensor.hpp"
 #include "hardware/Motor/motor.hpp"
+#include "units/units.hpp"
 #include "units/Angle.hpp"
 #include "units/Vector2D.hpp"
-#include "units/units.hpp"
+#include "lemlib/pid.hpp"
 
 class SwervePod {
     public:
@@ -17,9 +18,10 @@ class SwervePod {
          * @param offset The offset of the pod from the center of the robot
          * @param wheelDiameter The diameter of the wheel
          * @param diffyRatio The ratio of the top and bottom gears to the diffy wheel gear
+         * @param spinPID The PID controller for the pod's spin
          */
         SwervePod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor, lemlib::V5RotationSensor* rotSens,
-                  const Length wheelDiameter, const Number diffyRatio);
+                  const Length wheelDiameter, const Number diffyRatio, lemlib::PID spinPID);
 
         /**
          * @brief Initializes the pod, set the angle to 90º first before initialization (pointing forwards)
@@ -55,7 +57,7 @@ class SwervePod {
         const LinearVelocity m_maxSpeed;
         const AngularVelocity m_maxSpin;
 
-        
+        lemlib::PID m_spinPID;
 
         bool reversedWheel = false;
 };
