@@ -6,6 +6,7 @@
 #include "units/Angle.hpp"
 #include "units/Vector2D.hpp"
 #include "lemlib/pid.hpp"
+#include <optional>
 
 class SwervePod {
     public:
@@ -35,38 +36,61 @@ class SwervePod {
         Angle getAngle() const;
 
         /**
-         * @brief Move the pod with a certain wheel linear velocity and angular velocity
+         * @brief Move the pod to a certain angle without forwards motion
+         * @warning Stops the pod's current motion
+         * @warning Should only be used for pre-aligning the pod (e.g. before auton)
          */
-        void moveVelocity(const LinearVelocity speed, const AngularVelocity spin);
+        void setAngle(const Angle angle);
 
         /**
-         * @brief Move the pod with a certain wheel speed and spin percentage [-1, 1]
+         * @brief Get the target velocity vector of the pod
+         * @return The target velocity vector
          */
-        void movePcnt(const Number speedPcnt, const Number spinPcnt);
+        units::V2Velocity getVelVector() const;
 
         /**
          * @brief Move the pod with a certain velocity vector relative to the bot
          */
-        void moveVelVector(const units::V2Velocity velocity);
+        void setVelVector(const units::V2Velocity velocity);
+
+        void update();
     protected:
+        /**
+         * @brief Move the pod with a certain wheel linear velocity and angular velocity
+         * @note Private method that should only be called in the update function
+         */
+        void moveVelocity(const LinearVelocity speed, const AngularVelocity spin);
+
+        // Devices
         lemlib::Motor* m_topMotor;
         lemlib::Motor* m_bottomMotor;
         lemlib::V5RotationSensor* m_rotSens;
+
+        // Constants
         const Divided<Length, Angle> m_circumference;
         const Number m_diffyRatio;
         const LinearVelocity m_maxSpeed;
         const AngularVelocity m_maxSpin;
 
+        // PID
         lemlib::PID m_spinPID;
+
+        // State machine vars
+        units::V2Velocity targetVelocity = {0_inps, 0_inps};
+        std::optional<Angle> targetAngle = std::nullopt;
 
         bool reversedWheel = false;
 };
 
-class ChassisSwervePod : public SwervePod {
+using SwervePodPtr = std::unique_ptr<SwervePod>;
+
+class ChassisSwervePod {
     public:
-        ChassisSwervePod(SwervePod swervePod, const units::V2Position chassisOffset);
+        ChassisSwervePod(SwervePodPtr swervePod, const units::V2Position chassisOffset);
         void move(LinearVelocity forward, LinearVelocity strafe, AngularVelocity turn);
-    private:
+    protected:
+        SwervePodPtr m_pod;
+
         const units::V2Position m_offset; // The position of the pod relative to the center of the chassis
         const units::Vector2D<Divided<Length, Angle>> m_turnDirectionVec; // Direction vector to turn the chassis
         const units::Vector2D<Number> forwardDirVec = {0, 1}; // Normalized direction vector for forwards

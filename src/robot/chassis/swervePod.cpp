@@ -1,6 +1,7 @@
 #include "robot/chassis/swervePod.hpp"
 #include "lemlib/pid.hpp"
 #include "units/Angle.hpp"
+#include "units/Vector2D.hpp"
 #include "units/units.hpp"
 
 SwervePod::SwervePod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor, lemlib::V5RotationSensor* rotSens,
@@ -29,6 +30,20 @@ Angle SwervePod::getAngle() const {
     return units::constrainAngle360(reversedAngle);
 }
 
+void SwervePod::setAngle(const Angle angle) {
+    this->targetVelocity = {0_inps, 0_inps};
+    this->targetAngle = angle;
+}
+
+units::V2Velocity SwervePod::getVelVector() const {
+    return this->targetVelocity;
+}
+
+void SwervePod::setVelVector(const units::V2Velocity velocity) {
+    this->targetVelocity = velocity;
+    if (velocity.magnitude() != 0_inps) { this->targetAngle = std::nullopt; }
+}
+
 void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity spin) {
     // Clamp speed and spin
     auto clampedSpeed = units::clamp(speed, -m_maxSpeed, m_maxSpeed);
@@ -52,30 +67,28 @@ void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity s
     m_bottomMotor->moveVelocity(v_bottom);
 }
 
-void SwervePod::movePcnt(const Number speedPcnt, const Number spinPcnt) {
-    // v_linear = (v_top - v_bottom) * diffyRatio * wheelCircumference
-    // v_rot = (v_top + v_bottom) / 2
-    this->moveVelocity(speedPcnt * m_maxSpeed, spinPcnt * m_maxSpin);
-}
-
-void SwervePod::moveVelVector(const units::V2Velocity velocity) {
+void SwervePod::update() {
     Angle currentAngle = getAngle();
-    Angle targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(velocity);
+    Angle targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(this->targetVelocity);
     Angle error = units::constrainAngle180(targetAngle - currentAngle);
 
     if (units::abs(error) > 90_stDeg) { reversedWheel = !reversedWheel; }
 
-    AngularVelocity spinOutput = 0_radps;
-    LinearVelocity speedOutput = units::sin(error) * velocity.magnitude();
     // pid update with error, then clamp to velocity
+    AngularVelocity spinOutput = from_radps(m_spinPID.update(error.convert(rad)));
+    spinOutput = units::clamp(spinOutput, -m_maxSpin, m_maxSpin);
+    LinearVelocity speedOutput = units::sin(error) * this->targetVelocity.magnitude();
+    speedOutput = units::clamp(speedOutput, -m_maxSpeed, m_maxSpeed);
+
+    this->moveVelocity(speedOutput, spinOutput);
 }
 
-ChassisSwervePod::ChassisSwervePod(SwervePod swervePod, const units::V2Position chassisOffset)
-    : SwervePod(swervePod),
+ChassisSwervePod::ChassisSwervePod(SwervePodPtr swervePod, const units::V2Position chassisOffset)
+    : m_pod(std::move(swervePod)),
       m_offset(chassisOffset),
       m_turnDirectionVec(m_offset.rotatedBy(-90_stDeg) / rad) {}
 
 void ChassisSwervePod::move(LinearVelocity forward, LinearVelocity strafe, AngularVelocity turn) {
     units::V2Velocity podVelVector = (forward * forwardDirVec) + (strafe * strafeDirVec) + (turn * m_turnDirectionVec);
-    this->moveVelVector(podVelVector);
+    m_pod->setVelVector(podVelVector);
 }
