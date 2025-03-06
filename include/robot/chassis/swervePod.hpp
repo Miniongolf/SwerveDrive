@@ -36,6 +36,12 @@ class SwervePod {
         Angle getAngle() const;
 
         /**
+         * @brief Get the target angle of the pod
+         * @return The target angle
+         */
+        Angle getTargetAngle() const;
+
+        /**
          * @brief Move the pod to a certain angle without forwards motion
          * @warning Stops the pod's current motion
          * @warning Should only be used for pre-aligning the pod (e.g. before auton)
@@ -84,15 +90,31 @@ class SwervePod {
 
 using SwervePodPtr = std::unique_ptr<SwervePod>;
 
-class ChassisSwervePod {
+class ChassisSwervePod : public SwervePod {
     public:
-        ChassisSwervePod(SwervePodPtr swervePod, const units::V2Position chassisOffset);
+        ChassisSwervePod(SwervePod swervePod, const units::V2Position chassisOffset);
         void move(LinearVelocity forward, LinearVelocity strafe, AngularVelocity turn);
     protected:
-        SwervePodPtr m_pod;
-
         const units::V2Position m_offset; // The position of the pod relative to the center of the chassis
         const units::Vector2D<Divided<Length, Angle>> m_turnDirectionVec; // Direction vector to turn the chassis
         const units::Vector2D<Number> forwardDirVec = {0, 1}; // Normalized direction vector for forwards
         const units::Vector2D<Number> strafeDirVec = {1, 0}; // Normalized direction vector for strafing
 };
+
+using ChassisSwervePodPtr = std::unique_ptr<ChassisSwervePod>;
+
+/**
+ * @brief Make a swerve pod for the chassis
+ * @param topMotor The motor that controls the top gear (output rpm of the top gear, ccw)
+ * @param bottomMotor The motor that controls the bottom gear (output rpm of the bottom gear, ccw)
+ * @param rotSens The rotation sensor that measures the angle of the pod (direction should be set to standard
+ * angles, i.e. counterclockwise is positive, 0 is horizontal to the right)
+ * @param wheelDiameter The diameter of the wheel
+ * @param diffyRatio The ratio of the top and bottom gears to the diffy wheel gear
+ * @param spinPID The PID controller for the pod's spin
+ * @param chassisOffset The offset of the pod from the center of the robot
+ * @return Unique pointer to the swerve pod
+ */
+ChassisSwervePodPtr makeChassisPod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor,
+                                   lemlib::V5RotationSensor* rotSens, const Length wheelDiameter,
+                                   const Number diffyRatio, lemlib::PID spinPID, const units::V2Position chassisOffset);

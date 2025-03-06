@@ -30,18 +30,25 @@ Angle SwervePod::getAngle() const {
     return units::constrainAngle360(reversedAngle);
 }
 
+Angle SwervePod::getTargetAngle() const {
+    Angle vectorAngle = units::V2Velocity(0_inps, 0_inps).angleTo(targetVelocity);
+    return this->targetAngle.value_or(vectorAngle);
+}
+
 void SwervePod::setAngle(const Angle angle) {
     this->targetVelocity = {0_inps, 0_inps};
     this->targetAngle = angle;
 }
 
-units::V2Velocity SwervePod::getVelVector() const {
-    return this->targetVelocity;
-}
+units::V2Velocity SwervePod::getVelVector() const { return this->targetVelocity; }
 
 void SwervePod::setVelVector(const units::V2Velocity velocity) {
+    if (velocity.magnitude() == 0_inps) {
+        this->targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(targetVelocity);
+    } else {
+        this->targetAngle = std::nullopt;
+    }
     this->targetVelocity = velocity;
-    if (velocity.magnitude() != 0_inps) { this->targetAngle = std::nullopt; }
 }
 
 void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity spin) {
@@ -69,7 +76,7 @@ void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity s
 
 void SwervePod::update() {
     Angle currentAngle = getAngle();
-    Angle targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(this->targetVelocity);
+    Angle targetAngle = getTargetAngle();
     Angle error = units::constrainAngle180(targetAngle - currentAngle);
 
     if (units::abs(error) > 90_stDeg) { reversedWheel = !reversedWheel; }
@@ -83,12 +90,20 @@ void SwervePod::update() {
     this->moveVelocity(speedOutput, spinOutput);
 }
 
-ChassisSwervePod::ChassisSwervePod(SwervePodPtr swervePod, const units::V2Position chassisOffset)
-    : m_pod(std::move(swervePod)),
+ChassisSwervePod::ChassisSwervePod(SwervePod swervePod, const units::V2Position chassisOffset)
+    : SwervePod(swervePod),
       m_offset(chassisOffset),
       m_turnDirectionVec(m_offset.rotatedBy(-90_stDeg) / rad) {}
 
 void ChassisSwervePod::move(LinearVelocity forward, LinearVelocity strafe, AngularVelocity turn) {
     units::V2Velocity podVelVector = (forward * forwardDirVec) + (strafe * strafeDirVec) + (turn * m_turnDirectionVec);
-    m_pod->setVelVector(podVelVector);
+    this->setVelVector(podVelVector);
+}
+
+ChassisSwervePodPtr makeChassisPod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor,
+                                   lemlib::V5RotationSensor* rotSens, const Length wheelDiameter,
+                                   const Number diffyRatio, lemlib::PID spinPID,
+                                   const units::V2Position chassisOffset) {
+    return std::make_unique<ChassisSwervePod>(
+        SwervePod(topMotor, bottomMotor, rotSens, wheelDiameter, diffyRatio, spinPID), chassisOffset);
 }
