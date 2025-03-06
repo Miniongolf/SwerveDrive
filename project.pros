@@ -4,6 +4,28 @@
         "project_name": "SwerveDrive",
         "target": "v5",
         "templates": {
+            "LemLib": {
+                "location": "/Users/nicholas.cheng/Library/Application Support/PROS/templates/LemLib@0.6.0",
+                "metadata": {
+                    "origin": "local"
+                },
+                "name": "LemLib",
+                "py/object": "pros.conductor.templates.local_template.LocalTemplate",
+                "supported_kernels": "^4.1.1",
+                "system_files": [
+                    "include/units/Angle.hpp",
+                    "firmware/hot-cold-asset.mk",
+                    "include/units/Vector3D.hpp",
+                    "include/units/Vector2D.hpp",
+                    "firmware/LemLib.a",
+                    "include/units/units.hpp",
+                    "include/units/Temperature.hpp",
+                    "include/units/Pose.hpp"
+                ],
+                "target": "v5",
+                "user_files": [],
+                "version": "0.6.0"
+            },
             "hardware": {
                 "location": "/Users/nicholas.cheng/Library/Application Support/PROS/templates/hardware@0.4.2",
                 "metadata": {
