@@ -67,7 +67,7 @@ class SwervePod {
          */
         void setTarget(const Angle angle);
 
-        std::pair<LinearVelocity, AngularVelocity> calcVelocities();
+        VelocityPair calcVelocities();
 
         Number calcSaturation();
 

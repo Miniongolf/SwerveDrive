@@ -49,7 +49,7 @@ void SwervePod::setTarget(const units::V2Velocity velVector) {
     m_targetVelocity = velVector;
 }
 
-std::pair<LinearVelocity, AngularVelocity> SwervePod::calcVelocities() {
+VelocityPair SwervePod::calcVelocities() {
     Angle currentAngle = getAngle();
     Angle targetAngle = getTargetAngle();
     Angle error = units::constrainAngle180(targetAngle - currentAngle);
@@ -76,9 +76,10 @@ Number SwervePod::calcSaturation() {
 
 // Protected method
 PodMotorVels SwervePod::toPodVelPair(const LinearVelocity speed, const AngularVelocity spin,
-                                   const std::optional<Number> saturation) {
+                                     const std::optional<Number> saturation) {
+    // Do this instead of value_or to avoid side effects of updating cache when saturation is given
+    const Number saturationVal = saturation.has_value() ? saturation.value() : calcSaturation();
 
-    const Number saturationVal = saturation.value_or(calcSaturation());
     // Clamp speed and spin
     LinearVelocity clampedSpeed = units::clamp(speed, -m_maxSpeed, m_maxSpeed);
     if (reversedWheel) { clampedSpeed = -clampedSpeed; }
@@ -93,16 +94,9 @@ PodMotorVels SwervePod::toPodVelPair(const LinearVelocity speed, const AngularVe
 // Protected method
 void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity spin,
                              const std::optional<Number> saturation) {
-    auto [v_top, v_bottom] = toPodVelPair(speed, spin, saturation.value_or(calcSaturation()));
-
-    // Normalize velocities to max motor speed
-    AngularVelocity maxMotorSpeed = m_topMotor->getOutputVelocity();
-    AngularVelocity highSpeed = units::max(units::abs(v_top), units::abs(v_bottom));
-
-    if (highSpeed > maxMotorSpeed) {
-        v_bottom = maxMotorSpeed * v_bottom / highSpeed;
-        v_top = maxMotorSpeed * v_top / highSpeed;
-    }
+    // Do this instead of value_or to avoid side effects of updating cache when saturation is given
+    Number saturationVal = saturation.has_value() ? saturation.value() : calcSaturation();
+    auto [v_top, v_bottom] = toPodVelPair(speed, spin, saturationVal);
 
     m_topMotor->moveVelocity(v_top);
     m_bottomMotor->moveVelocity(v_bottom);

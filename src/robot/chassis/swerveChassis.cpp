@@ -12,6 +12,11 @@ void SwerveChassis::initialize() {
 
 void SwerveChassis::taskFunct() {
     while (true) {
-        for (ChassisSwervePodPtr& pod : m_pods) { pod->update(); }
+        pros::delay(10); // Wait to save CPU while devices update
+        Number maxSaturation = 1;
+        // Calculate the max saturation of all the pods
+        for (ChassisSwervePodPtr& pod : m_pods) { maxSaturation = units::max(pod->calcSaturation(), maxSaturation); }
+        // Update all the pods, using the highest saturation value
+        for (ChassisSwervePodPtr& pod : m_pods) { pod->update(maxSaturation); }
     }
 }
