@@ -34,7 +34,8 @@
  */
 #define PROS_USE_LITERALS
 
-#include "api.h"
+#include "api.h" // IWYU pragma: export
+#include "robot/chassis/swerveChassis.hpp" // IWYU pragma: export
 
 /**
  * You should add more #includes here

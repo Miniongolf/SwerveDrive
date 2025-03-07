@@ -8,6 +8,11 @@ class SwerveChassis {
          */
         SwerveChassis(std::vector<ChassisSwervePodPtr> swervePods);
 
+        /**
+         * @brief Initialize all pods and start the task
+         * @param velocity The velocity to move the chassis at
+         * @param spin The spin to move the chassis at
+         */
         void initialize();
     protected:
         void taskFunct();

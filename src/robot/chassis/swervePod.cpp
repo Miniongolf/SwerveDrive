@@ -1,7 +1,5 @@
 #include "robot/chassis/swervePod.hpp"
-#include "lemlib/pid.hpp"
 #include "units/Angle.hpp"
-#include "units/Vector2D.hpp"
 #include "units/units.hpp"
 
 SwervePod::SwervePod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor, lemlib::V5RotationSensor* rotSens,
@@ -31,35 +29,71 @@ Angle SwervePod::getAngle() const {
 }
 
 Angle SwervePod::getTargetAngle() const {
-    Angle vectorAngle = units::V2Velocity(0_inps, 0_inps).angleTo(targetVelocity);
-    return this->targetAngle.value_or(vectorAngle);
+    Angle vectorAngle = units::V2Velocity(0_inps, 0_inps).angleTo(m_targetVelocity);
+    return m_targetAngle.value_or(vectorAngle);
 }
 
-void SwervePod::setAngle(const Angle angle) {
-    this->targetVelocity = {0_inps, 0_inps};
-    this->targetAngle = angle;
+void SwervePod::setTarget(const Angle angle) {
+    m_targetVelocity = {0_inps, 0_inps};
+    m_targetAngle = angle;
 }
 
-units::V2Velocity SwervePod::getVelVector() const { return this->targetVelocity; }
+units::V2Velocity SwervePod::getTargetVector() const { return m_targetVelocity; }
 
-void SwervePod::setVelVector(const units::V2Velocity velocity) {
-    if (velocity.magnitude() == 0_inps) {
-        this->targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(targetVelocity);
+void SwervePod::setTarget(const units::V2Velocity velVector) {
+    if (velVector.magnitude() == 0_inps) {
+        m_targetAngle = units::V2Velocity(0_inps, 0_inps).angleTo(m_targetVelocity);
     } else {
-        this->targetAngle = std::nullopt;
+        m_targetAngle = std::nullopt;
     }
-    this->targetVelocity = velocity;
+    m_targetVelocity = velVector;
 }
 
-void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity spin) {
+std::pair<LinearVelocity, AngularVelocity> SwervePod::calcVelocities() {
+    Angle currentAngle = getAngle();
+    Angle targetAngle = getTargetAngle();
+    Angle error = units::constrainAngle180(targetAngle - currentAngle);
+
+    if (units::abs(error) > 90_stDeg) { reversedWheel = !reversedWheel; }
+
+    // pid update with error, then clamp to velocity
+    AngularVelocity spinOutput = from_radps(m_spinPID.update(error.convert(rad)));
+    spinOutput = units::clamp(spinOutput, -m_maxSpin, m_maxSpin);
+    LinearVelocity speedOutput = units::sin(error) * m_targetVelocity.magnitude();
+    speedOutput = units::clamp(speedOutput, -m_maxSpeed, m_maxSpeed);
+
+    m_velPairCache = {speedOutput, spinOutput};
+
+    return {speedOutput, spinOutput};
+}
+
+Number SwervePod::calcSaturation() {
+    auto [speed, spin] = this->calcVelocities();
+    // Make sure NOT to use std::nullopt for saturation here to avoid infinite recursion
+    auto [v_top, v_bottom] = toPodVelPair(speed, spin, 1);
+    return units::max(units::abs(v_top), units::abs(v_bottom)) / m_topMotor->getOutputVelocity();
+}
+
+// Protected method
+PodMotorVels SwervePod::toPodVelPair(const LinearVelocity speed, const AngularVelocity spin,
+                                   const std::optional<Number> saturation) {
+
+    const Number saturationVal = saturation.value_or(calcSaturation());
     // Clamp speed and spin
-    auto clampedSpeed = units::clamp(speed, -m_maxSpeed, m_maxSpeed);
+    LinearVelocity clampedSpeed = units::clamp(speed, -m_maxSpeed, m_maxSpeed);
     if (reversedWheel) { clampedSpeed = -clampedSpeed; }
 
-    auto clampedSpin = units::clamp(spin, -m_maxSpin, m_maxSpin);
+    AngularVelocity clampedSpin = units::clamp(spin, -m_maxSpin, m_maxSpin);
 
-    auto v_top = clampedSpin + (clampedSpeed / (2 * m_diffyRatio * m_circumference));
-    auto v_bottom = clampedSpin - (clampedSpeed / (2 * m_diffyRatio * m_circumference));
+    AngularVelocity v_top = clampedSpin + (clampedSpeed / (2 * m_diffyRatio * m_circumference));
+    AngularVelocity v_bottom = clampedSpin - (clampedSpeed / (2 * m_diffyRatio * m_circumference));
+    return {v_top / saturationVal, v_bottom / saturationVal};
+}
+
+// Protected method
+void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity spin,
+                             const std::optional<Number> saturation) {
+    auto [v_top, v_bottom] = toPodVelPair(speed, spin, saturation.value_or(calcSaturation()));
 
     // Normalize velocities to max motor speed
     AngularVelocity maxMotorSpeed = m_topMotor->getOutputVelocity();
@@ -74,20 +108,9 @@ void SwervePod::moveVelocity(const LinearVelocity speed, const AngularVelocity s
     m_bottomMotor->moveVelocity(v_bottom);
 }
 
-void SwervePod::update() {
-    Angle currentAngle = getAngle();
-    Angle targetAngle = getTargetAngle();
-    Angle error = units::constrainAngle180(targetAngle - currentAngle);
-
-    if (units::abs(error) > 90_stDeg) { reversedWheel = !reversedWheel; }
-
-    // pid update with error, then clamp to velocity
-    AngularVelocity spinOutput = from_radps(m_spinPID.update(error.convert(rad)));
-    spinOutput = units::clamp(spinOutput, -m_maxSpin, m_maxSpin);
-    LinearVelocity speedOutput = units::sin(error) * this->targetVelocity.magnitude();
-    speedOutput = units::clamp(speedOutput, -m_maxSpeed, m_maxSpeed);
-
-    this->moveVelocity(speedOutput, spinOutput);
+void SwervePod::update(const std::optional<Number> saturation) {
+    auto [speed, spin] = m_velPairCache;
+    this->moveVelocity(speed, spin, saturation);
 }
 
 ChassisSwervePod::ChassisSwervePod(SwervePod swervePod, const units::V2Position chassisOffset)
@@ -97,7 +120,7 @@ ChassisSwervePod::ChassisSwervePod(SwervePod swervePod, const units::V2Position 
 
 void ChassisSwervePod::move(LinearVelocity forward, LinearVelocity strafe, AngularVelocity turn) {
     units::V2Velocity podVelVector = (forward * forwardDirVec) + (strafe * strafeDirVec) + (turn * m_turnDirectionVec);
-    this->setVelVector(podVelVector);
+    this->setTarget(podVelVector);
 }
 
 ChassisSwervePodPtr makeChassisPod(lemlib::Motor* topMotor, lemlib::Motor* bottomMotor,

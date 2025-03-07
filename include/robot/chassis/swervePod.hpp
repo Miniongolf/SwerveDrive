@@ -1,12 +1,20 @@
 #pragma once
 
-#include "hardware/Encoder/V5RotationSensor.hpp"
-#include "hardware/Motor/motor.hpp"
+#include <optional>
+#include <utility>
 #include "units/units.hpp"
 #include "units/Angle.hpp"
 #include "units/Vector2D.hpp"
+#include "hardware/Encoder/V5RotationSensor.hpp"
+#include "hardware/Motor/motor.hpp"
 #include "lemlib/pid.hpp"
-#include <optional>
+
+struct PodMotorVels {
+        AngularVelocity v_top;
+        AngularVelocity v_bottom;
+};
+
+using VelocityPair = std::pair<LinearVelocity, AngularVelocity>;
 
 class SwervePod {
     public:
@@ -42,30 +50,44 @@ class SwervePod {
         Angle getTargetAngle() const;
 
         /**
-         * @brief Move the pod to a certain angle without forwards motion
-         * @warning Stops the pod's current motion
-         * @warning Should only be used for pre-aligning the pod (e.g. before auton)
-         */
-        void setAngle(const Angle angle);
-
-        /**
          * @brief Get the target velocity vector of the pod
          * @return The target velocity vector
          */
-        units::V2Velocity getVelVector() const;
+        units::V2Velocity getTargetVector() const;
 
         /**
          * @brief Move the pod with a certain velocity vector relative to the bot
          */
-        void setVelVector(const units::V2Velocity velocity);
+        void setTarget(const units::V2Velocity velVector);
 
-        void update();
+        /**
+         * @brief Move the pod to a certain angle without forwards motion
+         * @warning Stops the pod's current motion
+         * @warning Should only be used for pre-aligning the pod (e.g. before auton)
+         */
+        void setTarget(const Angle angle);
+
+        std::pair<LinearVelocity, AngularVelocity> calcVelocities();
+
+        Number calcSaturation();
+
+        /**
+         * @brief Update the pod's movement
+         * @param saturation The saturation factor for the pod's movement
+         * @note Should be called in a loop to update the pod's movement
+         * @warning Make sure saturation has been calculated first to update the cache, and then call this
+         */
+        void update(const std::optional<Number> saturation);
     protected:
+        PodMotorVels toPodVelPair(const LinearVelocity speed, const AngularVelocity spin,
+                                  const std::optional<Number> saturation);
+
         /**
          * @brief Move the pod with a certain wheel linear velocity and angular velocity
          * @note Private method that should only be called in the update function
          */
-        void moveVelocity(const LinearVelocity speed, const AngularVelocity spin);
+        void moveVelocity(const LinearVelocity speed, const AngularVelocity spin,
+                          const std::optional<Number> saturation);
 
         // Devices
         lemlib::Motor* m_topMotor;
@@ -81,9 +103,12 @@ class SwervePod {
         // PID
         lemlib::PID m_spinPID;
 
+        // Cache
+        VelocityPair m_velPairCache = {0_inps, 0_radps};
+
         // State machine vars
-        units::V2Velocity targetVelocity = {0_inps, 0_inps};
-        std::optional<Angle> targetAngle = std::nullopt;
+        units::V2Velocity m_targetVelocity = {0_inps, 0_inps};
+        std::optional<Angle> m_targetAngle = 90_stDeg;
 
         bool reversedWheel = false;
 };

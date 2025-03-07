@@ -78,6 +78,7 @@ void opcontrol() {
 	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 
+	SwervePod(new lemlib::Motor(1), new lemlib::Motor(-2), new lemlib::V5RotationSensor(3), 2.75_in, 4.0, lemlib::PID(2, 0, 0));
 
 	while (true) {
 		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
